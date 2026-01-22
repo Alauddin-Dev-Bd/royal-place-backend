@@ -38,7 +38,7 @@ const findAllTestimonials = catchAsyncHandeller(
 const findTestimonialsByRoomId = catchAsyncHandeller(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const result = await testimonialServices.findTestimonialByRoomId(id);
+    const result = await testimonialServices.findTestimonialByRoomId(id as string);
     res.status(200).json({
       success: true,
       message: `Testimonials for Room ID: ${id} fetched successfully`,
@@ -52,7 +52,7 @@ const deleteTestimonialById = catchAsyncHandeller(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const result = await testimonialServices.deleteTestimonialById(id);
+    const result = await testimonialServices.deleteTestimonialById(id as string);
 
     res.status(200).json({
       success: true,

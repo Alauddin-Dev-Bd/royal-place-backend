@@ -73,7 +73,7 @@ const loginUser = catchAsyncHandeller(
 const getSingleUser = catchAsyncHandeller(
   async (req: Request, res: Response, next: NextFunction) => {
     const id = sanitize(req.params.id);
-    const user = await userServices.findUserById(id);
+    const user = await userServices.findUserById(id as string);
 
     res.status(200).json({
       success: true,
@@ -102,7 +102,7 @@ const deleteUser = catchAsyncHandeller(
   async (req: Request, res: Response, next: NextFunction) => {
     const id = sanitize(req.params.id);
 
-    const deletedUser = await userServices.deleteUserById(id);
+    const deletedUser = await userServices.deleteUserById(id as string);
 
     res.status(200).json({
       success: true,
@@ -125,7 +125,7 @@ const updateUser = catchAsyncHandeller(
       updatedData = sanitize(req.body);
     }
 
-    const user = await userServices.updateUserById(id, updatedData);
+    const user = await userServices.updateUserById(id as string, updatedData);
     const payload = { id: user._id, role: user.role };
     const refreshToken = createRefreshToken(payload);
     const accessToken = createAccessToken(payload);

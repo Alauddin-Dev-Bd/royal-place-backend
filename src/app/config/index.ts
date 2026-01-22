@@ -28,4 +28,6 @@ export const envVariable = {
     "15m") as `${number}${"s" | "m" | "h" | "d"}`,
   JWT_REFRESH_TOKEN_EXPIRES_IN: (process.env.JWT_REFRESH_TOKEN_EXPIRES_IN ||
     "7d") as `${number}${"s" | "m" | "h" | "d"}`,
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRIPE_PUBLISHABLE_KEY:process.env.STRIPE_PUBLISHABLE_KEY,
 };

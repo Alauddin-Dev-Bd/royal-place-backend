@@ -56,7 +56,7 @@ const getRoomById = catchAsyncHandeller(async (req: Request, res: Response) => {
   // sanitize req.params.id
   const cleanId = sanitize(req.params.id);
 
-  const room = await roomService.getRoomById(cleanId);
+  const room = await roomService.getRoomById(cleanId as string);
   res.status(200).json({
     success: true,
     message: "Room retrieved successfully",
@@ -70,7 +70,7 @@ const updateRoom = catchAsyncHandeller(async (req: Request, res: Response) => {
   const cleanId = sanitize(req.params.id);
   const cleanBody = sanitize(req.body);
 
-  const room = await roomService.updateRoom(cleanId, cleanBody);
+  const room = await roomService.updateRoom(cleanId as string, cleanBody);
   res.status(200).json({
     success: true,
     message: "Room updated successfully",
@@ -83,7 +83,7 @@ const deleteRoom = catchAsyncHandeller(async (req: Request, res: Response) => {
   // sanitize req.params.id
   const cleanId = sanitize(req.params.id);
 
-  const room = await roomService.deleteRoom(cleanId);
+  const room = await roomService.deleteRoom(cleanId as string);
   res.status(200).json({
     success: true,
     message: "Room deleted successfully",

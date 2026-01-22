@@ -1,31 +1,21 @@
-import express, { Router } from "express";
+import express from "express";
 
 import { paymentController } from "../controllers/payment.controllers";
+import { authenticateUser } from "../middleware/authenticateUser";
 
 const router = express.Router();
 
-// payment sucess
-router.post(
-  "/success",
+// User
+router.post("/init", authenticateUser, paymentController.initPayment);
+router.get("/my",authenticateUser, paymentController.getMyPayments);
 
-  paymentController.paymentSuccess
-);
-// payment fail
-router.post(
-  "/fail",
+// SSLCommerz callbacks
+// router.post("/ipn", paymentController.handleIPN);
+router.post("/success", paymentController.paymentSuccess);
+router.post("/fail", paymentController.paymentFail);
+router.post("/cancel", paymentController.paymentCancel);
 
-  paymentController.paymentFail
-);
-
-// payment fail
-router.get(
-  "/cancel",
-
-  paymentController.paymentCancel
-);
-// get all paymnets
-router.get("/", paymentController.getPayments);
-// get payments by User id
-router.get("/:id", paymentController.getPaymentsByUserId);
+// Admin
+router.get("/", authenticateUser, paymentController.getPayments);
 
 export const paymentRoute = router;

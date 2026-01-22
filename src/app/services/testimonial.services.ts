@@ -13,7 +13,7 @@ const testimonialCreate = async (data: ITestimonial) => {
 
   const bookings = await BookingModel.findOne({
     userId: new mongoose.Types.ObjectId(userId),
-    bookingStatus: BookingStatus.Booked,
+    bookingStatus: BookingStatus.Confirmed,
     rooms: {
       $elemMatch: {
         roomId: new mongoose.Types.ObjectId(roomId),

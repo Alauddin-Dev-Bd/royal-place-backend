@@ -21,7 +21,7 @@ const getAdminOverview = async () => {
   /** 📌 Revenue (Total, Monthly, Today) **/
   const getRevenue = async (filter: object) => {
     const agg = await BookingModel.aggregate([
-      { $match: { bookingStatus: BookingStatus.Booked, ...filter } },
+      { $match: { bookingStatus: BookingStatus.Confirmed, ...filter } },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ]);
     return agg[0]?.total || 0;
@@ -75,7 +75,7 @@ const getAdminOverview = async () => {
 
   /** 📌 Top Customers **/
   const topCustomers = await BookingModel.aggregate([
-    { $match: { bookingStatus: BookingStatus.Booked } },
+    { $match: { bookingStatus: BookingStatus.Confirmed } },
     { $group: { _id: "$userId", totalSpent: { $sum: "$totalAmount" }, bookings: { $sum: 1 } } },
     { $sort: { totalSpent: -1 } },
     { $limit: 5 },
@@ -129,7 +129,7 @@ const getAdminOverview = async () => {
 const getReceptionistOverview = async () => {
   const today = dayjs().startOf("day").toDate();
   const todaysBookings = await BookingModel.countDocuments({ createdAt: { $gte: today } });
-  const checkedInGuests = await BookingModel.countDocuments({ bookingStatus: BookingStatus.Booked });
+  const checkedInGuests = await BookingModel.countDocuments({ bookingStatus: BookingStatus.Confirmed });
   const availableRooms = await RoomModel.countDocuments({ status: "available" });
 
   const stats = [
@@ -139,7 +139,7 @@ const getReceptionistOverview = async () => {
   ];
 
   const recentBookings = await BookingModel.find({
-    bookingStatus: { $in: [BookingStatus.Booked, BookingStatus.Pending] },
+    bookingStatus: { $in: [BookingStatus.Confirmed, BookingStatus.Pending] },
   })
     .sort({ createdAt: -1 })
     .limit(5)
@@ -159,7 +159,7 @@ export const getGuestOverview = async (userId: string) => {
   // ✅ Count bookings by status
   const totalPaidBookings = await BookingModel.countDocuments({
     userId: objectId,
-    bookingStatus: BookingStatus.Booked,
+    bookingStatus: BookingStatus.Confirmed,
   });
 
   const totalCancelBookings = await BookingModel.countDocuments({
@@ -177,7 +177,7 @@ export const getGuestOverview = async (userId: string) => {
     {
       $match: {
         userId: new Types.ObjectId(userId),
-        bookingStatus: BookingStatus.Booked || "Booked",
+        bookingStatus: BookingStatus.Confirmed || "Confirmed",
       },
     },
     {

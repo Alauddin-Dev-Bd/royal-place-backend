@@ -1,16 +1,11 @@
 import { Types } from "mongoose";
 
 export enum BookingStatus {
-  Pending = "pending",
-  Booked = "booked",
-  Cancelled = "cancelled",
-  InitiateCancel="InitiateCancel",
-  Failed = "failed",
+  Pending   = "PENDING",    // booking created, payment not done
+  Confirmed = "CONFIRMED",  // payment success
+  Cancelled = "CANCELLED",  // user/admin cancelled
+  Expired   = "EXPIRED",    // payment timeout
 }
-
-
-
-
 
 
 export interface IBookingRooms {
@@ -18,14 +13,15 @@ export interface IBookingRooms {
   checkInDate: Date;
   checkOutDate: Date;
   price: number;
-
 }
 
-
 export interface IBooking {
+  _id: string;
   userId: Types.ObjectId;
-  rooms: IBookingRooms[]
+  rooms: IBookingRooms[];
   totalAmount: number;
+
+  postcode: number;
   name: string;
   email: string;
   phone: string;
@@ -33,5 +29,6 @@ export interface IBooking {
   city: string;
   bookingStatus: BookingStatus;
   transactionId?: string;
-  cancelProbability?: number;
+  refundable: boolean; // <-- refundable flag
+  refundPercentage: number; // <-- how much to refund if canceled
 }

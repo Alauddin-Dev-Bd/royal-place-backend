@@ -37,7 +37,7 @@ const getAllGalleries = catchAsyncHandeller(
 const getGalleryById = catchAsyncHandeller(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const result = await galleryService.getGalleryById(id);
+    const result = await galleryService.getGalleryById(id as string);
     res.status(200).json({
       success: true,
       message: "Gallery item fetched successfully",
@@ -50,7 +50,7 @@ const getGalleryById = catchAsyncHandeller(
 const deleteGalleryById = catchAsyncHandeller(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const result = await galleryService.deleteGalleryById(id);
+    const result = await galleryService.deleteGalleryById(id as string);
     res.status(200).json({
       success: true,
       message: "Gallery item deleted successfully",

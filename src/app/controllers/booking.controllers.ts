@@ -7,19 +7,18 @@ import { bookingServices } from "../services/booking.services";
 const initiateBooking = catchAsyncHandeller(
   async (req: Request, res: Response) => {
     const bookingData = req.body;
-
-    //  Booking creation call kora
-    const result = await bookingServices.bookingInitialization(bookingData);
-
-    // 6. Response pathano
+    // console.log("Booking Data Received:", bookingData);
+    // Booking creation + Stripe payment initiation
+    const { bookingId } =
+      await bookingServices.bookingInitialization(bookingData);
+    // console.log("Booking Initialization Result:", bookingId);
     res.status(200).json({
       success: true,
-      payment_url: result.payment_url,
-      message: "Booking Initiate",
-      transactionId: result.transactionId,
-      data: bookingData,
+      message: "Booking initiated",
+
+      bookingId: bookingId,
     });
-  }
+  },
 );
 
 // ========================================Avalabe rooms For Booking=================================================
@@ -27,16 +26,15 @@ const initiateBooking = catchAsyncHandeller(
 const checkAvailableRoomsById = catchAsyncHandeller(
   async (req: Request, res: Response) => {
     const { roomId } = req.params;
-    const blockedDates = await bookingServices.getBookedDatesForRoomByRoomId(
-      roomId
-    );
+    const blockedDates =
+      await bookingServices.getBookedDatesForRoomByRoomId(roomId as string);
 
     res.status(200).json({
       success: true,
 
       data: blockedDates,
     });
-  }
+  },
 );
 
 // ======================================== chek booking rooms by user id=================================================
@@ -44,14 +42,14 @@ const checkAvailableRoomsById = catchAsyncHandeller(
 const checkbookingRoomsByUserId = catchAsyncHandeller(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const bookedRooms = await bookingServices.getBookedRoomsByUserId(id);
+    const bookedRooms = await bookingServices.getBookedRoomsByUserId(id as string);
 
     res.status(200).json({
       success: true,
 
       data: bookedRooms,
     });
-  }
+  },
 );
 // =====================================filter booking===========================================
 
@@ -64,14 +62,14 @@ const cancelBooking = catchAsyncHandeller(
   async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    const result = await bookingServices.cancelBookingService(id);
+    const result = await bookingServices.cancelBookingService(id as string);
 
     res.status(200).json({
       message: "Booking has been successfully cancelled",
       success: true,
       booking: result.booking,
     });
-  }
+  },
 );
 
 // ========================Exxport Controller=============================

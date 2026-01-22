@@ -1,11 +1,11 @@
 import {  Types } from "mongoose";
+// interfaces/payment.interface.ts
 export enum PaymentStatus {
-  Pending = "pending",
-  Completed = "completed",
-  Failed = "failed",
-  claimRefund = "claimRefund",
-  Refunded = "refunded",
-  Cancel="cancelled"
+  PENDING = "PENDING",
+  SUCCESS = "SUCCESS",
+  FAILED = "FAILED",
+  CANCELLED = "CANCELLED",
+  REFUNDED = "REFUNDED",
 }
 
 

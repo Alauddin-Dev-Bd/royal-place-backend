@@ -1,216 +1,210 @@
 import sanitize from "mongo-sanitize";
-import mongoose from "mongoose";
-import { verifyPayment } from "../integrations/aamarpay";
+import dotenv from "dotenv";
+import SSLCommerzPayment from "sslcommerz-lts";
+
 import PaymentModel from "../mongoSchema/payment.schema";
-import {
-  GetPaymentsOptions,
-  PaymentStatus,
-} from "../interfaces/payment.interfaces";
 import BookingModel from "../mongoSchema/booking.schema";
-import { BookingStatus } from "../interfaces/booking.interfcae";
 import { AppError } from "../error/appError";
+import { PaymentStatus } from "../interfaces/payment.interfaces";
 
-// ======================================================================Payment Verify with Success======================================================================
-const paymentVerify = async (transactionIdRaw: string) => {
-  // sanitize input
-  const transactionId = sanitize(transactionIdRaw);
+dotenv.config();
+const store_id = process.env.SSL_STORE_ID;
+const store_passwd = process.env.SSL_STORE_PASS;
+const is_live = false; //true for live, false for sandbox
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
+// ====================================================
+// 🔹 Init Payment (SSLCommerz)
+// ====================================================
+const calculateNights = (checkIn: string, checkOut: string): number => {
+  const inDate = new Date(checkIn);
+  const outDate = new Date(checkOut);
 
-  try {
-    // ✅ Step 1: Verify with AamarPay
-    const verificationResponse = await verifyPayment(transactionId);
-    console.log("AamarPay verification response:", verificationResponse);
+  const diffTime = outDate.getTime() - inDate.getTime();
+  const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
-    // ✅ Step 2: Get payment record
-    const payment = await PaymentModel.findOne({ transactionId }).session(
-      session
-    );
-    if (!payment) throw new Error("Payment not found");
-
-    // ✅ Step 3: Update status based on AamarPay response
-    if (
-      verificationResponse &&
-      verificationResponse.pay_status === "Successful"
-    ) {
-      payment.status = PaymentStatus.Completed;
-
-      // ✅ Also update booking as booked
-      await BookingModel.findByIdAndUpdate(
-        payment.bookingId,
-        { bookingStatus: BookingStatus.Booked },
-        { session }
-      );
-    } else {
-      payment.status = PaymentStatus.Failed;
-    }
-
-    // ✅ Step 4: Save changes
-    await payment.save({ session });
-    await session.commitTransaction();
-    session.endSession();
-
-    return payment;
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    throw error;
-  }
+  return Math.max(1, Math.round(diffDays));
 };
 
-// ===============================================================Payment Failed===================================================================
-const paymentFail = async (transactionIdRaw: string) => {
-  const transactionId = sanitize(transactionIdRaw);
+const paymentInit = async (bookingId: string, userId: string) => {
+  // 🛡 Sanitize input
+  bookingId = sanitize(bookingId);
+  userId = sanitize(userId);
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    // ✅ Step 1: Verify with AamarPay
-    const verificationResponse = await verifyPayment(transactionId);
-    console.log("AamarPay verification response:", verificationResponse);
-
-    // ✅ Step 2: Get payment record
-    const payment = await PaymentModel.findOne({ transactionId }).session(
-      session
-    );
-    if (!payment) throw new Error("Payment not found");
-
-    // ✅ Step 3: Update status based on AamarPay response
-    if (verificationResponse && verificationResponse.pay_status === "Failed") {
-      // Update payment status
-      payment.status = PaymentStatus.Failed;
-
-      // Also update booking status
-      const booking = await BookingModel.findOne({ transactionId }).session(
-        session
-      );
-      if (!booking) throw new Error("Booking not found");
-
-      booking.bookingStatus = BookingStatus.Failed;
-
-      // Save both documents
-      await payment.save({ session });
-      await booking.save({ session });
-
-      await session.commitTransaction();
-      session.endSession();
-
-      return payment;
-    } else {
-      throw new Error("Payment is not marked as failed by AamarPay");
-    }
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    throw error;
+  // 🔍 Find booking
+  const booking = await BookingModel.findById(bookingId);
+  if (!booking) {
+    throw new AppError("Booking not found", 404);
   }
-};
+  const room = booking.rooms[0];
 
-// ===============================================================Payment Cancel===================================================================
-const paymentCancel = async (transactionIdRaw: string) => {
-  const transactionId = sanitize(transactionIdRaw);
+  const nights = calculateNights(room.checkInDate as any, room.checkOutDate as any);
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  // ❌ Prevent duplicate PAID payment (CORRECT PLACE)
+  const paidPayment = await PaymentModel.findOne({
+    bookingId: booking._id,
+    status: "PAID",
+  });
 
-  try {
-    // Update booking status
-    const booking = await BookingModel.findOne({ transactionId }).session(
-      session
-    );
-    if (!booking) throw new Error("Booking not found");
-
-    const initiateCancel = (booking.bookingStatus =
-      BookingStatus.InitiateCancel);
-
-    // Save both documents
-
-    await booking.save({ session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    return initiateCancel;
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    throw error;
-  }
-};
-
-//================================get payments data====================================
-const getPayments = async (options: GetPaymentsOptions) => {
-  const page = options.page && options.page > 0 ? options.page : 1;
-  const limit =
-    options.limit && options.limit > 0 && options.limit <= 100
-      ? options.limit
-      : 10;
-  const status = options.status?.toLowerCase() || "all";
-  const searchTerm = options.searchTerm ? sanitize(options.searchTerm) : "";
-
-  const filter: any = {};
-
-  if (status !== "all") {
-    filter.status = status;
+  if (paidPayment) {
+    throw new AppError("Payment already completed", 400);
   }
 
-  if (searchTerm) {
-    filter.$or = [
-      { guest: { $regex: searchTerm, $options: "i" } },
-      { transactionId: { $regex: searchTerm, $options: "i" } },
-      { email: { $regex: searchTerm, $options: "i" } },
-    ];
+  // 🧾 SSLCommerz Payload
+  const paymentData = {
+    // 💰 Transaction
+    total_amount: booking.totalAmount,
+    currency: "BDT",
+    tran_id: booking.transactionId,
+
+    // 🔁 Redirect URLs
+    success_url: `${process.env.BASE_URL}/api/v1/payments/success?tran_id=${booking.transactionId}`,
+    fail_url: `${process.env.BASE_URL}/api/v1/payments/fail`,
+    cancel_url: `${process.env.BASE_URL}/api/v1/payments/cancel`,
+    ipn_url: `${process.env.BASE_URL}/api/v1/payments/ipn`,
+
+    // 📦 Product
+    // product_name: "Hotel Room Booking",
+    product_category: "Hotel",
+    product_profile: "travel-vertical",
+
+    // // 🏨 Travel Vertical (Required)
+    hotel_name: "Royal Palace",
+    length_of_stay: `${nights} nights`,
+    check_in_time: "12:00 PM",
+    hotel_city: booking.city,
+    // 👤 Customer
+    cus_name: booking.name,
+    cus_email: booking.email,
+    cus_phone: booking.phone,
+    cus_city: booking.city,
+    cus_country: "Bangladesh",
+
+    // 🚚 Shipping
+    shipping_method: "NO",
+
+    // 🧩 Reference values
+    value_a: booking._id.toString(),
+    value_b: userId.toString(),
+  };
+
+  // 🔐 SSLCommerz Init
+  const sslcz = new SSLCommerzPayment(store_id!, store_passwd!, false);
+  console.log({
+    is_live,
+    store_id,
+  });
+  // console.log(sslcz)
+
+  const response = await sslcz.init(paymentData);
+  // console.log(response);
+
+  if (!response?.GatewayPageURL) {
+    throw new AppError("SSLCommerz initialization failed", 500);
   }
 
-  const total = await PaymentModel.countDocuments(filter);
-  const pages = Math.ceil(total / limit);
+  // 🧾 Create / Update payment record (idempotent)
+  await PaymentModel.findOneAndUpdate(
+    { transactionId: booking.transactionId },
+    {
+      bookingId: booking._id,
+      userId,
+      amount: booking.totalAmount,
+      status: PaymentStatus.PENDING,
+    },
+    { upsert: true, new: true },
+  );
 
-  const data = await PaymentModel.find(filter)
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .lean();
-
+  // 🚀 Return gateway URL
   return {
-    data,
-    total,
-    page,
-    pages,
+    transactionId: booking.transactionId,
+    paymentUrl: response.GatewayPageURL,
   };
 };
 
-// ================get payments data getby userId=================================
-const paymentsGetByUserId = async (userId: string) => {
-  const bookings = await BookingModel.find({ userId }).select("transactionId");
+// ====================================================
+// 🔹 IPN Handler (FINAL AUTHORITY)
+// ====================================================
+const handleIPN = async (ipnData: any) => {
+  const tranId = sanitize(ipnData.tran_id);
+  const status = ipnData.status;
 
-  if (!bookings.length) {
-    throw new AppError("No bookings found for this user.", 404);
+  if (!tranId) {
+    throw new AppError("Invalid IPN payload", 400);
   }
 
-  const transactionIds = bookings
-    .map((booking) => booking.transactionId)
-    .filter(Boolean);
+  if (status === "VALID") {
+    await BookingModel.findOneAndUpdate(
+      { transactionId: tranId },
+      { paymentStatus: "PAID" },
+    );
 
-  if (!transactionIds.length) {
-    throw new AppError("No valid transaction IDs found from bookings.", 404);
+    await PaymentModel.findOneAndUpdate(
+      { transactionId: tranId },
+      {
+        status: "SUCCESS",
+        ipnData,
+      },
+    );
   }
 
-  const payments = await PaymentModel.find({
-    transactionId: { $in: transactionIds },
-  });
+  if (status === "FAILED") {
+    await BookingModel.findOneAndUpdate(
+      { transactionId: tranId },
+      { paymentStatus: "FAILED" },
+    );
 
-  if (!payments.length) {
-    throw new AppError("No payments found for the given transactions.", 404);
+    await PaymentModel.findOneAndUpdate(
+      { transactionId: tranId },
+      {
+        status: "FAILED",
+        ipnData,
+      },
+    );
   }
+
+  return true;
+};
+
+// ====================================================
+// 🔹 Get Payments (Admin)
+// ====================================================
+const getPayments = async (options: any) => {
+  const query: any = {};
+
+  if (options?.status) {
+    query.status = sanitize(options.status);
+  }
+
+  if (options?.userId) {
+    query.userId = sanitize(options.userId);
+  }
+
+  const payments = await PaymentModel.find(query)
+    .populate("bookingId")
+    .sort({ createdAt: -1 });
 
   return payments;
 };
+
+// ====================================================
+// 🔹 Get Payments by User
+// ====================================================
+const getPaymentsByUserId = async (userId: string) => {
+  userId = sanitize(userId);
+
+  const payments = await PaymentModel.find({ userId })
+    .populate("bookingId")
+    .sort({ createdAt: -1 });
+
+  return payments;
+};
+
+// ====================================================
+// 🔹 Export Service
+// ====================================================
 export const paymentServices = {
-  paymentVerify,
-  paymentFail,
-  paymentCancel,
+  paymentInit,
+  handleIPN,
   getPayments,
-  paymentsGetByUserId,
+  getPaymentsByUserId,
 };

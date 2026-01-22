@@ -12,21 +12,20 @@ const bookingSchema = new Schema<IBooking>(
           ref: "Room",
           required: true,
         },
-        checkInDate: { type: String, required: true },
-        checkOutDate: { type: String, required: true },
+        checkInDate: { type: Date, required: true },
+        checkOutDate: { type: Date, required: true },
       },
     ],
-
+  
     totalAmount: { type: Number, required: true },
-
     name: { type: String, required: true },
     email: { type: String, required: true },
     phone: { type: String, required: true },
     address: { type: String, required: true },
     city: { type: String, required: true },
+    postcode:{ type: Number, required: true },
 
     transactionId: { type: String, unique: true },
-    cancelProbability: { type: Number, default: 0 },
     bookingStatus: {
       type: String,
       enum: Object.values(BookingStatus),

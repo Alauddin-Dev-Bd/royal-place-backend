@@ -39,7 +39,7 @@ const getAllAmenities = catchAsyncHandeller(
 // ==================================================Delete Aminite by Id=======================================================
 const deleteAmenitie = catchAsyncHandeller(
   async (req: Request, res: Response) => {
-    const service = await amenitieServices.deleteAmenities(req.params.id);
+    const service = await amenitieServices.deleteAmenities(req.params.id as string);
     console.log("delete", service);
 
     res.status(200).json({
@@ -69,7 +69,7 @@ const updateAmenitie = catchAsyncHandeller(
     }
 
     const updatedService = await amenitieServices.updateAmenitie(
-      id,
+      id as string,
       updateData
     );
 
