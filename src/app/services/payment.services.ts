@@ -96,7 +96,7 @@ const paymentInit = async (bookingId: string, userId: string) => {
   // console.log(sslcz)
 
   const response = await sslcz.init(paymentData);
-  // console.log(response);
+  console.log(response);
 
   if (!response?.GatewayPageURL) {
     throw new AppError("SSLCommerz initialization failed", 500);
