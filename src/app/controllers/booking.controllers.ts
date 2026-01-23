@@ -7,16 +7,14 @@ import { bookingServices } from "../services/booking.services";
 const initiateBooking = catchAsyncHandeller(
   async (req: Request, res: Response) => {
     const bookingData = req.body;
-    // console.log("Booking Data Received:", bookingData);
-    // Booking creation + Stripe payment initiation
-    const { bookingId } =
+
+    const { paymentUrl, transactionId } =
       await bookingServices.bookingInitialization(bookingData);
-    // console.log("Booking Initialization Result:", bookingId);
     res.status(200).json({
       success: true,
-      message: "Booking initiated",
-
-      bookingId: bookingId,
+      message: "Booking and payment initialized successfully",
+      transactionId: transactionId,
+      paymentUrl: paymentUrl,
     });
   },
 );
@@ -26,8 +24,9 @@ const initiateBooking = catchAsyncHandeller(
 const checkAvailableRoomsById = catchAsyncHandeller(
   async (req: Request, res: Response) => {
     const { roomId } = req.params;
-    const blockedDates =
-      await bookingServices.getBookedDatesForRoomByRoomId(roomId as string);
+    const blockedDates = await bookingServices.getBookedDatesForRoomByRoomId(
+      roomId as string,
+    );
 
     res.status(200).json({
       success: true,
@@ -42,7 +41,9 @@ const checkAvailableRoomsById = catchAsyncHandeller(
 const checkbookingRoomsByUserId = catchAsyncHandeller(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const bookedRooms = await bookingServices.getBookedRoomsByUserId(id as string);
+    const bookedRooms = await bookingServices.getBookedRoomsByUserId(
+      id as string,
+    );
 
     res.status(200).json({
       success: true,

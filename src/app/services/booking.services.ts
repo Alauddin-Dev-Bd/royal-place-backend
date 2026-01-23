@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-import { differenceInDays } from "date-fns";
+import { add, differenceInDays } from "date-fns";
 import dayjs from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
@@ -9,198 +9,13 @@ import { AppError } from "../error/appError";
 import { PaymentStatus } from "../interfaces/payment.interfaces";
 import PaymentModel from "../mongoSchema/payment.schema";
 import BookingModel from "../mongoSchema/booking.schema";
-import { envVariable } from "../config";
-import RoomModel from "../mongoSchema/room.schema";
 
-
-dayjs.extend(isSameOrBefore);
-dayjs.extend(isSameOrAfter);
-
-interface RoomBooking {
-  roomId: string;
-  price: number;
-  checkInDate: string;
-  checkOutDate: string;
-}
-
-const calculateTotalAmount = (rooms: RoomBooking[]): number => {
-  let totalAmount = 0;
-
-  rooms.forEach((room) => {
-    const nights = differenceInDays(
-      new Date(room.checkOutDate),
-      new Date(room.checkInDate),
-    );
-
-    if (nights <= 0) {
-      throw new Error(
-        `Invalid check-in/check-out dates for room ${room.roomId}`,
-      );
-    }
-
-    if (typeof room.price !== "number") {
-      throw new Error(`Invalid price for room ${room.roomId}`);
-    }
-
-    totalAmount += room.price * nights;
-  });
-
-  return totalAmount;
-};
-
-// ===================================== Generate TranId ==========================================
-function generateTransactionId() {
-  return "TXN" + Date.now() + Math.floor(Math.random() * 1000);
-}
-
-// Utility: get all dates between two dates inclusive
-function getDateRangeArray(startDate: string, endDate: string): string[] {
-  const dates: string[] = [];
-  let currDate = dayjs(startDate);
-  const lastDate = dayjs(endDate);
-  while (currDate.isSameOrBefore(lastDate)) {
-    dates.push(currDate.format("YYYY-MM-DD"));
-    currDate = currDate.add(1, "day");
-  }
-  return dates;
-}
-
-// ========================================== Booking Initialization ==================================
-// const bookingInitialization = async (bookingData: IBooking) => {
-//   const { userId, rooms, name, email, city, address, phone } = bookingData;
-
-//   const roomIds = rooms.map((r) => r.roomId);
-
-//   const session = await mongoose.startSession();
-//   session.startTransaction();
-
-//   try {
-//     // 1. Check Availability: Rooms overlapping with requested dates
-//     const existingBookings = await BookingModel.find({
-//       "rooms.roomId": { $in: roomIds },
-//       $or: rooms.map((r) => ({
-//         $or: [
-//           {
-//             "rooms.checkInDate": {
-//               $lt: new Date(r.checkOutDate),
-//               $gte: new Date(r.checkInDate),
-//             },
-//           },
-//           {
-//             "rooms.checkOutDate": {
-//               $gt: new Date(r.checkInDate),
-//               $lte: new Date(r.checkOutDate),
-//             },
-//           },
-//           {
-//             "rooms.checkInDate": { $lte: new Date(r.checkInDate) },
-//             "rooms.checkOutDate": { $gte: new Date(r.checkOutDate) },
-//           },
-//         ],
-//       })),
-//       bookingStatus: { $in: [BookingStatus.Booked, BookingStatus.Pending] }, // check both booked & pending
-//     }).session(session);
-
-//     if (existingBookings.length > 0) {
-//       throw new AppError(
-//         "One or more rooms are already booked in this period",
-//         409
-//       );
-//     }
-
-//     // 2. Room Detail Validation
-//     const roomDetails = await RoomModel.find({ _id: { $in: roomIds } }).session(
-//       session
-//     );
-//     if (roomDetails.length !== roomIds.length) {
-//       throw new AppError("Some rooms not found", 404);
-//     }
-
-//     // 3. Calculate Total Amount (based on nights)
-//     let totalAmount = 0;
-//     for (const room of rooms) {
-//       const nights = differenceInDays(
-//         new Date(room.checkOutDate),
-//         new Date(room.checkInDate)
-//       );
-//       if (nights <= 0) {
-//         throw new AppError(
-//           `Invalid check-in/check-out dates for room ${room.roomId}`,
-//           400
-//         );
-//       }
-//       if (typeof room.price !== "number") {
-//         throw new AppError(`Invalid price for room ${room.roomId}`, 400);
-//       }
-//       totalAmount += room.price * nights;
-//     }
-
-//     // 4. Generate Transaction ID
-//     const transactionId = generateTransactionId();
-
-//     // 5. Save Booking
-//     const [createdBooking] = await BookingModel.create(
-//       [
-//         {
-//           userId,
-//           rooms: rooms.map((r) => ({
-//             roomId: r.roomId,
-//             checkInDate: r.checkInDate,
-//             checkOutDate: r.checkOutDate,
-//           })),
-//           totalAmount,
-//           bookingStatus: BookingStatus.Pending,
-//           name,
-//           email,
-//           address,
-//           city,
-//           phone,
-//           transactionId,
-//         },
-//       ],
-//       { session }
-//     );
-
-//     // 6. Initiate Payment
-//     const paymentResult = await initiatePayment({
-//       amount: createdBooking.totalAmount,
-//       transactionId: createdBooking.transactionId as string,
-//       name,
-//       email,
-//       phone,
-//       address,
-//       city,
-//     });
-
-//     if (!paymentResult?.payment_url) {
-//       throw new AppError("Payment initiation failed", 500);
-//     }
-
-//     // 7. Save Payment
-//     const paymentData = {
-//       userId,
-//       bookingId: createdBooking._id,
-//       amount: createdBooking.totalAmount,
-//       paymentMethod: "aamarpay",
-//       status: PaymentStatus.Pending,
-//       transactionId: createdBooking.transactionId,
-//     };
-
-//     await PaymentModel.create([paymentData], { session });
-
-//     await session.commitTransaction();
-//     session.endSession();
-
-//     return {
-//       payment_url: paymentResult.payment_url,
-//       transactionId,
-//     };
-//   } catch (error) {
-//     await session.abortTransaction();
-//     session.endSession();
-//     throw error;
-//   }
-// };
+import { bookingQueue } from "../queues/booking-queue";
+import { roomsCalculates } from "../utils/roomCalculations";
+import { checkConflictedRooms } from "../utils/checkRoomAvailablity";
+import { calculateTotalAmount } from "../utils/caculateAmount";
+import { getDateRangeArray } from "../utils/getDateRangeArray";
+import { sslcommerzPaymentInit } from "../utils/sslCommerzPayment";
 
 // ======================================= Get Booked Dates For Room =================================
 const getBookedDatesForRoomByRoomId = async (roomId: string) => {
@@ -211,7 +26,7 @@ const getBookedDatesForRoomByRoomId = async (roomId: string) => {
   const today = dayjs().startOf("day");
 
   const bookings = await BookingModel.find({
-    bookingStatus: { $in: [BookingStatus.Confirmed, BookingStatus.Pending] },
+    bookingStatus: { $in: [BookingStatus.Confirmed] },
     "rooms.roomId": new mongoose.Types.ObjectId(roomId),
   }).select("rooms -_id");
 
@@ -256,63 +71,6 @@ const getBookedRoomsByUserId = async (userId: string) => {
 
   return bookings;
 };
-
-// const getBookedRoomsByUserId = async (userId: string) => {
-//   if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-//     throw new AppError("Invalid or missing User ID", 400);
-//   }
-
-//   // Find bookings and populate rooms.roomId
-//   const bookings = await BookingModel.find({ userId })
-//     .populate("rooms.roomId")
-//     .sort({ createdAt: -1 });
-
-//   if (!bookings.length) {
-//     return {
-//       guestName: null,
-//       detailBookedDates: [],
-//     };
-//   }
-
-//   const guestName = bookings[0].name;
-
-//   const detailBookedDates: {
-//     _id: string;
-//     title: string;
-//     amount: number;
-//     nights: number;
-//     checkInDate: string;
-//     checkOutDate: string;
-//     bookingStatus: string;
-//   }[] = [];
-
-//   for (const booking of bookings) {
-//     for (const room of booking.rooms) {
-//       if (room.checkInDate && room.checkOutDate) {
-//         const roomId = room.roomId;
-//         const title = isRoomPopulated(roomId)
-//           ? roomId.title
-//           : "Untitled Room";
-
-//         detailBookedDates.push({
-//           _id: booking._id.toString(),
-//           title,
-//           nights: dayjs(room.checkOutDate).diff(dayjs(room.checkInDate), "day"),
-//           amount: booking.totalAmount,
-//           checkInDate: dayjs(room.checkInDate).format("YYYY-MM-DD"),
-//           checkOutDate: dayjs(room.checkOutDate).format("YYYY-MM-DD"),
-//           bookingStatus: booking.bookingStatus,
-//         });
-
-//       }
-//     }
-//   }
-
-//   return {
-//     guestName,
-//     detailBookedDates,
-//   };
-// };
 
 // ======================================= Filter Bookings ============================================
 const filterBookings = async (queryParams: any) => {
@@ -424,52 +182,19 @@ const bookingInitialization = async (bookingData: IBooking) => {
   const { userId, rooms, name, email, city, address, phone, postcode } =
     bookingData;
 
-  // 1️⃣ Prepare rooms
-  const roomsForCalculation: RoomBooking[] = rooms.map((room) => ({
-    roomId: room.roomId.toString(),
-    price: room.price,
-    checkInDate: new Date(room.checkInDate).toISOString().split("T")[0],
-    checkOutDate: new Date(room.checkOutDate).toISOString().split("T")[0],
-  }));
+  // 1️⃣ rooms calculate (nights included)
+  const roomsForCalculation = roomsCalculates(rooms as any);
 
-  // 2️⃣ Check availability for each room
-  const conflictedRooms: string[] = [];
+  // 2️⃣ check conflict rooms
+  await checkConflictedRooms(roomsForCalculation);
 
-  for (const room of roomsForCalculation) {
-    const overlappingBooking = await BookingModel.findOne({
-      "rooms.roomId": room.roomId,
-      $or: [
-        {
-          "rooms.checkInDate": { $lte: room.checkOutDate },
-          "rooms.checkOutDate": { $gte: room.checkInDate },
-        },
-      ],
-      bookingStatus: { $in: [BookingStatus.Confirmed] },
-    });
-
-    if (overlappingBooking) {
-      // 🔹 fetch room title
-      const roomData = await RoomModel.findById(room.roomId);
-      conflictedRooms.push(roomData?.title || room.roomId);
-    }
-  }
-
-  if (conflictedRooms.length > 0) {
-    throw new AppError(
-      `The following rooms are already booked for the selected dates: ${conflictedRooms.join(
-        ", ",
-      )}`,
-      400,
-    );
-  }
-
-  // 3️⃣ Calculate total amount
+  // 3️⃣ calculate total amount
   const totalAmount = calculateTotalAmount(roomsForCalculation);
 
-  // 4️⃣ Generate Transaction ID
+  // Generate Transaction ID
   const transactionId = "TXN" + Date.now() + Math.floor(Math.random() * 1000);
 
-  // 5️⃣ Save Booking in DB as Pending
+  //  Save Booking in DB as Pending
   const booking = await BookingModel.create({
     userId,
     rooms,
@@ -484,8 +209,56 @@ const bookingInitialization = async (bookingData: IBooking) => {
     postcode,
   });
 
+  // bookingQueue add hare
 
-  return { bookingId: booking._id, transactionId };
+  await bookingQueue.add("booking-created", {
+    bookingId: booking._id,
+    transactionId,
+  });
+
+  // ❌ Prevent duplicate PAID payment (CORRECT PLACE)
+  const paidPayment = await PaymentModel.findOne({
+    bookingId: booking._id,
+    status: PaymentStatus.SUCCESS,
+  });
+
+  if (paidPayment) {
+    throw new AppError("Payment already completed", 400);
+  }
+
+  const nights = roomsForCalculation?.[0]?.nights;
+
+  // ssl commerz
+  const paymntData = {
+    name: booking.name,
+    email: booking.email,
+    phone: booking.phone,
+    address: booking.address,
+    postcode: booking.postcode,
+    city:booking.city,
+    totalAmount,
+    transactionId,
+    nights,
+    userId,
+  };
+
+  const { paymentUrl } = await sslcommerzPaymentInit(paymntData as IBooking);
+ 
+
+  await PaymentModel.findOneAndUpdate(
+    { transactionId: transactionId },
+    {
+      bookingId: booking._id,
+      userId,
+      amount: totalAmount,
+      status: PaymentStatus.PENDING,
+    },
+    { upsert: true, new: true },
+  );
+  return {
+    transactionId: booking.transactionId,
+    paymentUrl,
+  };
 };
 
 // ======================== Export Services =============================

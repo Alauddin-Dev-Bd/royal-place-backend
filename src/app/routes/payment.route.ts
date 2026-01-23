@@ -5,8 +5,6 @@ import { authenticateUser } from "../middleware/authenticateUser";
 
 const router = express.Router();
 
-// User
-router.post("/init", authenticateUser, paymentController.initPayment);
 router.get("/my",authenticateUser, paymentController.getMyPayments);
 
 // SSLCommerz callbacks

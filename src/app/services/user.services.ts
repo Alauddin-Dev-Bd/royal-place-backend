@@ -4,7 +4,7 @@ import sanitize from "mongo-sanitize";
 
 import { logger } from "../utils/logger";
 import { AppError } from "../error/appError";
-import { redisClient } from "../config/redis";
+
 import { envVariable } from "../config";
 import {
   IUpdateUserInput,
@@ -13,18 +13,19 @@ import {
 } from "../interfaces/user.interfaces";
 import UserModel from "../mongoSchema/user.schema";
 import { genericQuery } from "../utils/queryUtils";
+import { redis } from "../config/redis";
 
 // Helper to clear related caches
 const clearUserCache = async (userId?: string) => {
   // Clear all users list caches
-  const keys = await redisClient.keys("users:*");
+  const keys = await redis.keys("users:*");
   for (const key of keys) {
-    await redisClient.del(key);
+    await redis.del(key);
   }
 
   // Clear single user cache if userId provided
   if (userId) {
-    await redisClient.del(`user:${userId}`);
+    await redis.del(`user:${userId}`);
   }
 
   console.log("🧹 Cleared related Redis caches");
@@ -67,7 +68,7 @@ const findUserById = async (id: string) => {
   const cleanId = sanitize(id);
   const cacheKey = `user:${cleanId}`;
 
-  const cachedUser = await redisClient.get(cacheKey);
+  const cachedUser = await redis.get(cacheKey);
   if (cachedUser) {
     console.log("✅ Returning user from Redis cache");
     return JSON.parse(cachedUser);
@@ -77,7 +78,7 @@ const findUserById = async (id: string) => {
   const user = await UserModel.findById(cleanId);
   if (!user) throw new AppError("User not found!", 404);
 
-  await redisClient.setEx(cacheKey, 3600, JSON.stringify(user));
+  await redis.setex(cacheKey, 3600, JSON.stringify(user));
   console.log("💾 Cached user data in Redis");
 
   return user;
@@ -87,7 +88,7 @@ const findUserById = async (id: string) => {
 const getAllUsers = async (query: IUserQuery) => {
   const cacheKey = `users:${JSON.stringify(query)}`;
 
-  const cached = await redisClient.get(cacheKey);
+  const cached = await redis.get(cacheKey);
   if (cached) {
     console.log("✅ Returning users from Redis cache");
     return JSON.parse(cached);
@@ -100,7 +101,7 @@ const getAllUsers = async (query: IUserQuery) => {
     // select: "name email phone",
   });
 
-  await redisClient.setEx(cacheKey, 1800, JSON.stringify(result));
+  await redis.setex(cacheKey, 1800, JSON.stringify(result));
   console.log("💾 Saved users to Redis cache");
 
   return result;

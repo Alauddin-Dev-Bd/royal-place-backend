@@ -4,7 +4,7 @@ import { bookingController } from "../controllers/booking.controllers";
 
 const router = express.Router();
 
-router.post("/", bookingController.initiateBooking);
+router.post("/init", bookingController.initiateBooking);
 
 router.patch("/:id", bookingController.cancelBooking);
 

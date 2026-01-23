@@ -8,27 +8,6 @@ import BookingModel from "../mongoSchema/booking.schema";
 import { BookingStatus } from "../interfaces/booking.interfcae";
 
 // ====================================================
-// 🔹 INIT PAYMENT (User → SSLCommerz Redirect)
-// POST /payments/init
-// ====================================================
-const initPayment = catchAsyncHandeller(async (req: Request, res: Response) => {
-  const { bookingId } = req.body;
-  const userId = req.user!._id; // auth middleware required
-
-  const result = await paymentServices.paymentInit(
-    bookingId,
-    userId.toString(),
-  );
-
-  res.status(200).json({
-    success: true,
-    message: "Payment initialized successfully",
-    transactionId: result.transactionId,
-    paymentUrl: result.paymentUrl,
-  });
-});
-
-// ====================================================
 // 🔹 SSLCommerz IPN (FINAL AUTHORITY)
 // POST /payments/ipn
 // ====================================================
@@ -43,42 +22,41 @@ const handleIPN = catchAsyncHandeller(async (req: Request, res: Response) => {
 // 🔹 PAYMENT SUCCESS REDIRECT
 // GET /payments/success
 // ====================================================
-export const paymentSuccess = catchAsyncHandeller(async (req: Request, res: Response) => {
-  console.log("✅ SUCCESS HIT", req.query);
+export const paymentSuccess = catchAsyncHandeller(
+  async (req: Request, res: Response) => {
+    // SSLCommerz fallback
+    const tranId = req.query.tran_id || Object.keys(req.query)[0];
+    if (!tranId) {
+      return res.status(400).send("Invalid transaction");
+    }
 
-  // SSLCommerz fallback
-  const tranId = req.query.tran_id || Object.keys(req.query)[0]; 
-  if (!tranId) {
-    return res.status(400).send("Invalid transaction");
-  }
+    // 🛡 Sanitize
+    const sanitizedTranId = sanitize(tranId.toString());
 
-  // 🛡 Sanitize
-  const sanitizedTranId = sanitize(tranId.toString());
+    // 🔄 Update Payment & Booking
+    const payment = await PaymentModel.findOneAndUpdate(
+      { transactionId: sanitizedTranId },
+      { status: PaymentStatus.SUCCESS },
+      { new: true },
+    );
 
-  // 🔄 Update Payment & Booking
-  const payment = await PaymentModel.findOneAndUpdate(
-    { transactionId: sanitizedTranId },
-    { status: PaymentStatus.SUCCESS },
-    { new: true }
-  );
+    if (!payment) {
+      return res.status(404).send("Payment record not found");
+    }
 
-  if (!payment) {
-    return res.status(404).send("Payment record not found");
-  }
+    const booking = await BookingModel.findOneAndUpdate(
+      { transactionId: sanitizedTranId },
+      { bookingStatus: BookingStatus.Confirmed },
+      { new: true },
+    );
 
-  const booking = await BookingModel.findOneAndUpdate(
-    { transactionId: sanitizedTranId },
-    { bookingStatus: BookingStatus.Confirmed },
-    { new: true }
-  );
+    if (!booking) {
+      return res.status(404).send("Booking record not found");
+    }
 
-  if (!booking) {
-    return res.status(404).send("Booking record not found");
-  }
-
-  // 🚀 Send HTML response
-  res.setHeader("Content-Type", "text/html");
-  res.send(`
+    // 🚀 Send HTML response
+    res.setHeader("Content-Type", "text/html");
+    res.send(`
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -98,19 +76,12 @@ export const paymentSuccess = catchAsyncHandeller(async (req: Request, res: Resp
 </head>
 <body>
   <div class="card">
-    <div class="success">✅</div>
+
     <h1>Payment Successful</h1>
     <p>Your payment has been received successfully.</p>
 
-    <div class="txn">
-      <strong>Transaction ID:</strong><br/>
-      ${sanitizedTranId}
-    </div>
-
-    <div class="txn">
-      <strong>Booking ID:</strong><br/>
-      ${booking._id.toString()}
-    </div>
+  
+  
 
     <a href="https://royal-place.vercel.app/dashboard/user/bookings">
       Go to My Bookings
@@ -119,16 +90,17 @@ export const paymentSuccess = catchAsyncHandeller(async (req: Request, res: Resp
 </body>
 </html>
   `);
-});
-
+  },
+);
 
 // ====================================================
 // 🔹 PAYMENT FAIL REDIRECT
 // GET /payments/fail
 // ====================================================
-const paymentFail = catchAsyncHandeller(async (_req: Request, res: Response) => {
-  res.setHeader("Content-Type", "text/html");
-  res.send(`
+const paymentFail = catchAsyncHandeller(
+  async (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/html");
+    res.send(`
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -155,15 +127,17 @@ const paymentFail = catchAsyncHandeller(async (_req: Request, res: Response) => 
 </body>
 </html>
   `);
-});
+  },
+);
 
 // ====================================================
 // 🔹 PAYMENT CANCEL REDIRECT
 // GET /payments/cancel
 // ====================================================
-const paymentCancel = catchAsyncHandeller(async (_req: Request, res: Response) => {
-  res.setHeader("Content-Type", "text/html");
-  res.send(`
+const paymentCancel = catchAsyncHandeller(
+  async (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/html");
+    res.send(`
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -190,8 +164,8 @@ const paymentCancel = catchAsyncHandeller(async (_req: Request, res: Response) =
 </body>
 </html>
   `);
-});
-
+  },
+);
 
 // ====================================================
 // 🔹 GET ALL PAYMENTS (Admin)
@@ -229,7 +203,6 @@ const getMyPayments = catchAsyncHandeller(
 // 🔹 EXPORT CONTROLLER
 // ====================================================
 export const paymentController = {
-  initPayment,
   handleIPN,
   paymentSuccess,
   paymentFail,

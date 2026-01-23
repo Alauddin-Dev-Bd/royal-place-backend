@@ -1,11 +1,13 @@
 import { Types } from "mongoose";
 
 export enum BookingStatus {
-  Pending   = "PENDING",    // booking created, payment not done
-  Confirmed = "CONFIRMED",  // payment success
-  Cancelled = "CANCELLED",  // user/admin cancelled
-  Expired   = "EXPIRED",    // payment timeout
+  Initiated = "INITIATED",   // user room select (temporary)
+  Pending   = "PENDING",     // booking created, payment pending
+  Confirmed = "CONFIRMED",   // payment success → room locked
+  Cancelled = "CANCELLED",   // user/admin cancelled
+  Expired   = "EXPIRED",     // payment timeout
 }
+
 
 
 export interface IBookingRooms {
@@ -20,7 +22,7 @@ export interface IBooking {
   userId: Types.ObjectId;
   rooms: IBookingRooms[];
   totalAmount: number;
-
+  nights: number;
   postcode: number;
   name: string;
   email: string;
