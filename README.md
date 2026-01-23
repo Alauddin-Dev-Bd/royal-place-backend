@@ -14,14 +14,14 @@ This API powers essential features such as room booking, user management, paymen
 | **Database**              | MongoDB (Mongoose ORM)                           |
 | **Cache / Session Store** | Redis                                            |
 | **Authentication**        | JWT (Access & Refresh Tokens)                    |
-| **Payment Gateway**       | AamarPay                                         |
+| **Payment Gateway**       | SSLCOMMERZ                                       |
 | **File Storage**          | Cloudinary                                       |
 | **Validation**            | Zod                                              |
 | **Logging**               | Winston + Morgan                                 |
 | **Security**              | Helmet, CORS, Mongo Sanitize, Express Rate Limit |
 | **Rate Limiting**         | express-rate-limit                               |
 | **Date Utilities**        | Day.js & Date-fns                                |
-| **Dev Tools**             | ts-node-dev, pnpm, Docker Compose                |
+| **Dev Tools**             | ts-node-dev, npm , Docker Compose                |
 
 ---
 
@@ -29,10 +29,9 @@ This API powers essential features such as room booking, user management, paymen
 
 * 🔐 **User Authentication & Role Management**
 * 🏠 **Room Booking System**
-* 💳 **Aamarpay Payment Integration**
+* 💳 **SSLCOMMERZ Payment Integration**
 * 🏖 **Hotel Amenities & Services**
 * 💬 **Customer Testimonials**
-* 🔄 **Refund & Cancellation Prediction Endpoint**
 * ⚡ **Redis Caching & Session Management** (New)
 * 🧱 **Zod Validation for Strong Input Schema**
 * 🔒 **Rate Limiting to Prevent Brute Force Attacks**
@@ -53,10 +52,10 @@ cd royal-place-backend
 
 ### 2️⃣ Install Dependencies
 
-This project **exclusively uses pnpm** (recommended for speed and workspace efficiency):
+This project **exclusively uses npm** (recommended for speed and workspace efficiency):
 
 ```bash
-pnpm install
+npm install
 ```
 
 ---
@@ -100,12 +99,12 @@ JWT_REFRESH_TOKEN_SECRET=efee9e64e21450ebfa5a97d0e767ebe2ed8b4e85027ba8d
 JWT_REFRESH_TOKEN_EXPIRES_IN=7d
 
 # ----------------------
-# Payment (AamarPay)
+# Payment SSLCOMMERZ
 # ----------------------
-AAMARPAY_STORE_ID=
-AAMARPAY_SIGNATURE_KEY=
-CANCEL_URL=/api/payments/cancel
-FAIL_URL=/api/payments/fail
+SSL_STORE_ID=
+SSL_STORE_PASS=
+SSL_IS_LIVE=true
+BASE_URL=http://localhost:5000
 
 # ----------------------
 # ML / External APIs

@@ -112,7 +112,7 @@ export const paymentSuccess = catchAsyncHandeller(async (req: Request, res: Resp
       ${booking._id.toString()}
     </div>
 
-    <a href="http://localhost:3000/dashboard/user/bookings">
+    <a href="https://royal-place.vercel.app/dashboard/user/bookings">
       Go to My Bookings
     </a>
   </div>
@@ -150,7 +150,7 @@ const paymentFail = catchAsyncHandeller(async (_req: Request, res: Response) => 
   <div class="fail">❌</div>
   <h1>Payment Failed</h1>
   <p>Your payment could not be completed.</p>
-  <a href="http://localhost:3000/cart">Go Back to Cart</a>
+  <a href="https://royal-place.vercel.app/cart">Go Back to Cart</a>
 </div>
 </body>
 </html>
@@ -185,7 +185,7 @@ const paymentCancel = catchAsyncHandeller(async (_req: Request, res: Response) =
   <div class="cancel">⚠️</div>
   <h1>Payment Cancelled</h1>
   <p>You have cancelled the payment.</p>
-  <a href="http://localhost:3000/cart">Return to Cart</a>
+  <a href="https://royal-place.vercel.app/cart">Return to Cart</a>
 </div>
 </body>
 </html>
