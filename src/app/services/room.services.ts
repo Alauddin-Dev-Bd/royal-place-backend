@@ -1,21 +1,22 @@
 import sanitize from "mongo-sanitize";
 import { AppError } from "../error/appError";
-import { redisClient } from "../config/redis";
+
 import { genericQuery } from "../utils/queryUtils";
 import { IRoom, RoomQuery } from "../interfaces/room.interfaces";
 import RoomModel from "../mongoSchema/room.schema";
+import { redis } from "../config/redis";
 
 // Helper to clear related caches
 const clearRoomCache = async (roomId?: string) => {
   // Clear all rooms list caches
-  const keys = await redisClient.keys("rooms:*");
+  const keys = await redis.keys("rooms:*");
   for (const key of keys) {
-    await redisClient.del(key);
+    await redis.del(key);
   }
 
   // Clear single room cache if roomId provided
   if (roomId) {
-    await redisClient.del(`rooms:${JSON.stringify(roomId)}`);
+    await redis.del(`rooms:${JSON.stringify(roomId)}`);
   }
 
   console.log("🧹 Cleared related Redis caches");
@@ -45,7 +46,7 @@ export const getAllRooms = async (query: RoomQuery) => {
   console.log(query);
   const cacheKey = `rooms:${JSON.stringify(query)}`;
 
-  const cached = await redisClient.get(cacheKey);
+  const cached = await redis.get(cacheKey);
   if (cached) {
     console.log("✅ Returning rooms from Redis cache");
     return JSON.parse(cached);
@@ -67,7 +68,7 @@ export const getAllRooms = async (query: RoomQuery) => {
   });
 
   // Save to Redis cache 30 min
-  await redisClient.setEx(cacheKey, 1800, JSON.stringify(result));
+  await redis.setex(cacheKey, 1800, JSON.stringify(result));
   console.log("💾 Saved rooms to Redis cache");
 
   return result;
@@ -78,7 +79,7 @@ export const getRoomById = async (id: string) => {
   const cleanId = sanitize(id);
   const cacheKey = `rooms:${JSON.stringify(id)}`;
 
-  const cached = await redisClient.get(cacheKey);
+  const cached = await redis.get(cacheKey);
   if (cached) {
     console.log("✅ Returning room from Redis cache");
     return JSON.parse(cached);
@@ -87,7 +88,7 @@ export const getRoomById = async (id: string) => {
   const room = await RoomModel.findById(cleanId);
   if (!room) throw new AppError("Room not found!", 404);
 
-  await redisClient.setEx(cacheKey, 1800, JSON.stringify(room));
+  await redis.setex(cacheKey, 1800, JSON.stringify(room));
   console.log("💾 Saved single room to Redis cache");
 
   return room;

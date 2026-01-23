@@ -4,7 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 import morgan from "morgan"; // moragn → fixed
-import { redisClient, connectRD } from "./app/config/redis";
+
 import { envVariable } from "./app/config";
 import { mainRoutes } from "./app/apiRoutes";
 import globalErrorHandler from "./app/middleware/globalErrorHandeller";
@@ -18,12 +18,10 @@ import swaggerUi from "swagger-ui-express";
 import { swaggerDoc } from "./app/config/swagger";
 import * as Sentry from "@sentry/node";
 
-
 // ==============================
 // App Configuration
 // ==============================
 const app: Application = express();
-
 
 // -------------------------------
 // Rate limiter
@@ -43,7 +41,7 @@ app.disable("x-powered-by");
 app.use(
   morgan("combined", {
     stream: { write: (message) => logger.info(message.trim()) },
-  })
+  }),
 );
 
 // -------------------------------
@@ -53,7 +51,7 @@ app.use(
   cors({
     origin: true,
     credentials: true,
-  })
+  }),
 );
 
 // -------------------------------
@@ -67,23 +65,6 @@ app.use(express.urlencoded({ extended: true }));
 // Sanitize
 // -------------------------------
 app.use(sanitizeMiddleware);
-
-// -------------------------------
-// Redis
-// -------------------------------
-connectRD().catch(console.error);
-
-const redisStore = new RedisStore({ client: redisClient });
-
-app.use(
-  session({
-    store: redisStore,
-    secret: envVariable.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: cookieOptions,
-  })
-);
 
 // -------------------------------
 // Routes
