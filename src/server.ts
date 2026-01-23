@@ -13,11 +13,11 @@ async function server() {
     logger.info("🛢 Database connected");
 
     // 2️⃣ Initialize Kafka producer
-    await initProducer();
+    // await initProducer();
 
     // 3️⃣ Start Kafka consumers
-    await startPaymentConsumer();
-    await startNotificationConsumer();
+    // await startPaymentConsumer();
+    // await startNotificationConsumer();
 
     // 4️⃣ Start Express app
     app.listen(envVariable.PORT, () => {
