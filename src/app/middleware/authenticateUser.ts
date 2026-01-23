@@ -3,7 +3,7 @@ import { AppError } from "../error/appError";
 import { envVariable } from "../config";
 
 import { catchAsyncHandeller } from "../utils/handeller/catchAsyncHandeller";
-import UserModel from "../mongoSchema/v1/userSchema/user.schema";
+import UserModel from "../mongoSchema/user.schema";
 
 interface JwtDecodedPayload {
   id: string;

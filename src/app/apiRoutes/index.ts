@@ -1,11 +1,12 @@
 import { Application, Router } from "express";
-import { userRoute } from "../routes/v1/user.route";
-import { roomRoute } from "../routes/v1/room.route";
-import { bookingRoute } from "../routes/v1/booking.route";
-import { paymentRoute } from "../routes/v1/payment.route";
-// import { serviceRoute } from "../routes/v1/amenitie.routes";
-import { testimonialRoute } from "../routes/v1/testimonial.route";
-import { dashboardRoute } from "../routes/v1/dashboard.route";
+import { userRoute } from "../routes/user.route";
+
+import { bookingRoute } from "../routes/booking.route";
+import { paymentRoute } from "../routes/payment.route";
+import { roomRoute } from "../routes/room.route";
+import { testimonialRoute } from "../routes/testimonial.route";
+import { dashboardRoute } from "../routes/dashboard.route";
+import { serviceRoute } from "../routes/amenitie.route";
 
 // -------------------
 // 1. Route Interface
@@ -23,7 +24,7 @@ export const routesV1: IRouteV1[] = [
   { path: "/rooms", handler: roomRoute },
   { path: "/bookings", handler: bookingRoute },
   { path: "/payments", handler: paymentRoute },
-  // { path: "/services", handler: serviceRoute },
+  { path: "/services", handler: serviceRoute },
   { path: "/testimonials", handler: testimonialRoute },
   { path: "/dashboards", handler: dashboardRoute },
 ];

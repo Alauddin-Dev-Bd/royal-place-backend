@@ -15,74 +15,66 @@ import { cookieOptions } from "./app/config/cookie";
 import { logger } from "./app/utils/logger";
 import { sanitizeMiddleware } from "./app/middleware/sanitizeMiddleware";
 import swaggerUi from "swagger-ui-express";
-import {  swaggerDoc} from "./app/config/swagger";
+import { swaggerDoc } from "./app/config/swagger";
+import * as Sentry from "@sentry/node";
+
+
 // ==============================
 // App Configuration
 // ==============================
 const app: Application = express();
 
+
 // -------------------------------
-// Rate limiter middleware
+// Rate limiter
 // -------------------------------
 app.use(rateLimiter);
 
-// ---------------------------------
-// Helmet middleware
-// Adds security headers like CSP, HSTS, XSS protection etc.
-// ---------------------------------
+// -------------------------------
+// Helmet
+// -------------------------------
 app.use(helmet());
 
-// --------------------------------
-// Disable X-powered-by-header
-// ---------------------------------
 app.disable("x-powered-by");
 
-// -----------------------------------
-// Morgan for logging
-// -----------------------------------
+// -------------------------------
+// Morgan
+// -------------------------------
 app.use(
   morgan("combined", {
     stream: { write: (message) => logger.info(message.trim()) },
   })
 );
 
-// ---------------------------------
-// CORS Setup
-// ---------------------------------
+// -------------------------------
+// CORS
+// -------------------------------
 app.use(
   cors({
     origin: true,
     credentials: true,
-    allowedHeaders: "*",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   })
 );
 
-// ------------------------------
-// Body Parsing & Cookie Parsing Middleware
+// -------------------------------
+// Body & Cookie
 // -------------------------------
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ---------------------------------
-// Sanitize Middleware — Prevent XSS & NoSQL Injection
-// ---------------------------------
+// -------------------------------
+// Sanitize
+// -------------------------------
 app.use(sanitizeMiddleware);
 
 // -------------------------------
-// Redis Connect
+// Redis
 // -------------------------------
-connectRD().catch((err) => console.error("Redis connection failed", err))
+connectRD().catch(console.error);
 
-// -------------------------------
-// Redis Session Store
-// -------------------------------
 const redisStore = new RedisStore({ client: redisClient });
 
-// ------------------------------
-// Express Session Middleware
-// ------------------------------
 app.use(
   session({
     store: redisStore,
@@ -93,44 +85,36 @@ app.use(
   })
 );
 
-// ----------------------------------
-// Root Route
-// -----------------------------------
-
-app.get("/", (req: Request, res: Response) => {
-  res.status(200).json({
-    success: true,
-    message: `Server running`,
-  });
+// -------------------------------
+// Routes
+// -------------------------------
+app.get("/debug-sentry", (req, res) => {
+  throw new Error("My first Sentry error!");
 });
 
+app.get("/", (req, res) => {
+  res.json({ success: true, message: "Server running" });
+});
 
-// ----------------------------------
-// Swagger UI Setup
-// ----------------------------------
-swaggerDoc(app)
-
-// ---------------------------------
-// Main API Routes
-// ---------------------------------
+swaggerDoc(app);
 mainRoutes(app);
 
-// ---------------------------------
-// 404 Not Found Handler (must be after all routes)
-// ---------------------------------
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.status(404).json({
-    success: false,
-    message: "Page Not Found",
-  });
+// -------------------------------
+// 404
+// -------------------------------
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: "Page Not Found" });
 });
 
-// ---------------------------------
-// Global Error Handler
-// ---------------------------------
+// ==============================
+// SENTRY ERROR HANDLER (BEFORE GLOBAL)
+// ==============================
+// MUST be before your global handler
+app.use(Sentry.expressErrorHandler());
+
+// ==============================
+// GLOBAL ERROR HANDLER (LAST)
+// ==============================
 app.use(globalErrorHandler);
 
-// ------------------------------
-// Export App
-// ------------------------------
 export default app;

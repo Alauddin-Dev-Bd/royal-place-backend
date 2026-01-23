@@ -1,33 +1,23 @@
-
-# Use official lightweight Node.js 18 alpine image
-
-
+# Use official Node.js 18 alpine image
 FROM node:18-alpine
 
 # Set working directory
-
 WORKDIR /app
 
-# Install pnpm globally
+# Copy package.json & package-lock.json first (for caching)
+COPY package*.json ./
 
-
-RUN npm install -g pnpm
-
-# Copy package.json and pnpm-lock.yaml (if exists) first for caching dependencies
-COPY package*.json pnpm-lock.yaml* ./
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN npm install
+
 # Copy all source code
 COPY . .
 
 # Build TypeScript project
+RUN npm run build
 
-RUN pnpm run build
-
-# Expose port your app listens on
-
+# Expose app port
 EXPOSE 5000
 
-# Start the app in production mode
-
-CMD ["pnpm", "run", "start"]
+# Start app
+CMD ["npm", "run", "start"]
