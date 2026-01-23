@@ -12,8 +12,6 @@ import BookingModel from "../mongoSchema/booking.schema";
 import { envVariable } from "../config";
 import RoomModel from "../mongoSchema/room.schema";
 
-import { KAFKA_TOPICS } from "../kafka/topics";
-import { sendMessage } from "../kafka/kafkaProducer";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
@@ -486,16 +484,6 @@ const bookingInitialization = async (bookingData: IBooking) => {
     postcode,
   });
 
-  // 6️⃣ Emit Kafka Event
-  await sendMessage(KAFKA_TOPICS.BOOKING_EVENTS, {
-    event: "BOOKING_CREATED",
-    bookingId: booking._id.toString(),
-    userId: userId.toString(),
-    totalAmount,
-    transactionId,
-  });
-
-  console.log("check2", rooms);
 
   return { bookingId: booking._id, transactionId };
 };
