@@ -179,86 +179,111 @@ const cancelBookingService = async (bookingId: string) => {
 };
 
 const bookingInitialization = async (bookingData: IBooking) => {
-  const { userId, rooms, name, email, city, address, phone, postcode } =
-    bookingData;
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  // 1️⃣ rooms calculate (nights included)
-  const roomsForCalculation = roomsCalculates(rooms as any);
+  try {
+    const { userId, rooms, name, email, city, address, phone, postcode } =
+      bookingData;
 
-  // 2️⃣ check conflict rooms
-  await checkConflictedRooms(roomsForCalculation);
+    // 1️⃣ rooms calculate
+    const roomsForCalculation = roomsCalculates(rooms as any);
 
-  // 3️⃣ calculate total amount
-  const totalAmount = calculateTotalAmount(roomsForCalculation);
+    // 2️⃣ check conflict rooms
+    await checkConflictedRooms(roomsForCalculation);
 
-  // Generate Transaction ID
-  const transactionId = "TXN" + Date.now() + Math.floor(Math.random() * 1000);
+    // 3️⃣ calculate total amount
+    const totalAmount = calculateTotalAmount(roomsForCalculation);
 
-  //  Save Booking in DB as Pending
-  const booking = await BookingModel.create({
-    userId,
-    rooms,
-    totalAmount,
-    transactionId,
-    bookingStatus: BookingStatus.Pending,
-    name,
-    email,
-    city,
-    address,
-    phone,
-    postcode,
-  });
+    // Generate Transaction ID
+    const transactionId =
+      "TXN" + Date.now() + Math.floor(Math.random() * 1000);
 
-  // bookingQueue add hare
+    // 4️⃣ Create booking (PENDING)
+    const booking = await BookingModel.create(
+      [
+        {
+          userId,
+          rooms,
+          totalAmount,
+          transactionId,
+          bookingStatus: BookingStatus.Pending,
+          name,
+          email,
+          city,
+          address,
+          phone,
+          postcode,
+        },
+      ],
+      { session },
+    );
 
-  await bookingQueue.add("booking-created", {
-    bookingId: booking._id,
-    transactionId,
-  });
+    // 5️⃣ Prevent duplicate PAID payment
+    const paidPayment = await PaymentModel.findOne(
+      {
+        bookingId: booking[0]._id,
+        status: PaymentStatus.SUCCESS,
+      },
+      null,
+      { session },
+    );
 
-  // ❌ Prevent duplicate PAID payment (CORRECT PLACE)
-  const paidPayment = await PaymentModel.findOne({
-    bookingId: booking._id,
-    status: PaymentStatus.SUCCESS,
-  });
+    if (paidPayment) {
+      throw new AppError("Payment already completed", 400);
+    }
 
-  if (paidPayment) {
-    throw new AppError("Payment already completed", 400);
-  }
+    const nights = roomsForCalculation?.[0]?.nights;
 
-  const nights = roomsForCalculation?.[0]?.nights;
+    // 6️⃣ Create / Update payment (PENDING)
+    await PaymentModel.findOneAndUpdate(
+      { transactionId },
+      {
+        bookingId: booking[0]._id,
+        userId,
+        amount: totalAmount,
+        status: PaymentStatus.PENDING,
+      },
+      { upsert: true, new: true, session },
+    );
 
-  // ssl commerz
-  const paymntData = {
-    name: booking.name,
-    email: booking.email,
-    phone: booking.phone,
-    address: booking.address,
-    postcode: booking.postcode,
-    city:booking.city,
-    totalAmount,
-    transactionId,
-    nights,
-    userId,
-  };
+    // ✅ Commit transaction
+    await session.commitTransaction();
+    session.endSession();
 
-  const { paymentUrl } = await sslcommerzPaymentInit(paymntData as IBooking);
- 
+    // 7️⃣ Queue add (AFTER commit)
+    await bookingQueue.add("booking-created", {
+      bookingId: booking[0]._id,
+      transactionId,
+    });
 
-  await PaymentModel.findOneAndUpdate(
-    { transactionId: transactionId },
-    {
-      bookingId: booking._id,
+    // 8️⃣ Payment gateway call
+    const paymntData = {
+      name,
+      email,
+      phone,
+      address,
+      postcode,
+      city,
+      totalAmount,
+      transactionId,
+      nights,
       userId,
-      amount: totalAmount,
-      status: PaymentStatus.PENDING,
-    },
-    { upsert: true, new: true },
-  );
-  return {
-    transactionId: booking.transactionId,
-    paymentUrl,
-  };
+    };
+
+    const { paymentUrl } = await sslcommerzPaymentInit(
+      paymntData as IBooking,
+    );
+
+    return {
+      transactionId,
+      paymentUrl,
+    };
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
 };
 
 // ======================== Export Services =============================
