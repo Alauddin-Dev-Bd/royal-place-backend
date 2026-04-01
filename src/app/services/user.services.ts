@@ -64,10 +64,29 @@ const loginUserByEmail = async (email: string, password: string) => {
 };
 
 // ================================= Find single user =================================
-const findUserById = async (id: string) => {
-  const cleanId = sanitize(id);
-  const cacheKey = `user:${cleanId}`;
+const getSingleUser = async (query:{name?: string, email?: string}) => {
+  console.log("🔍 user with query:", query);
 
+  // sanitize input
+  const sanitizedQuery = sanitize(query);
+
+  // Determine search field
+  let cacheKey;
+  let mongoQuery;
+
+  if (sanitizedQuery.email) {
+    const email = sanitizedQuery.email.toLowerCase();
+    cacheKey = `user:email:${email}`;
+    mongoQuery = { email: { $regex: `^${email}$`, $options: "i" } };
+  } else if (sanitizedQuery.name) {
+    const name = sanitizedQuery.name.toLowerCase();
+    cacheKey = `user:name:${name}`;
+    mongoQuery = { name: { $regex: `^${name}$`, $options: "i" } };
+  } else {
+    throw new AppError("Email or name is required!", 400);
+  }
+
+  // Check Redis cache
   const cachedUser = await redis.get(cacheKey);
   if (cachedUser) {
     console.log("✅ Returning user from Redis cache");
@@ -75,15 +94,15 @@ const findUserById = async (id: string) => {
   }
 
   console.log("🟡 Data from MongoDB (Cache miss)");
-  const user = await UserModel.findById(cleanId);
+  const user = await UserModel.findOne(mongoQuery).select("-password -__v -isDeleted");
   if (!user) throw new AppError("User not found!", 404);
 
+  // Cache in Redis
   await redis.setex(cacheKey, 3600, JSON.stringify(user));
   console.log("💾 Cached user data in Redis");
 
   return user;
 };
-
 // ================================= Find all users =================================
 const getAllUsers = async (query: IUserQuery) => {
   const cacheKey = `users:${JSON.stringify(query)}`;
@@ -175,7 +194,7 @@ const requestRefreshToken = async (refreshToken: string) => {
 export const userServices = {
   registerUserIntoDb,
   loginUserByEmail,
-  findUserById,
+  getSingleUser,
   getAllUsers,
   deleteUserById,
   updateUserById,

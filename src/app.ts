@@ -69,15 +69,24 @@ app.use(sanitizeMiddleware);
 // -------------------------------
 // Routes
 // -------------------------------
-app.get("/debug-sentry", (req, res) => {
+app.get("/api/debug-sentry", function mainHandler(req, res) {
+  // Send a log before throwing the error
+  Sentry.logger.info('User triggered test error', {
+    action: 'test_error_endpoint',
+  });
+  // Send a test metric before throwing the error
+  Sentry.metrics.count('test_counter', 1);
   throw new Error("My first Sentry error!");
-});
+})
 
 app.get("/", (req, res) => {
-  res.json({ success: true, message: "Server running" });
+  res.json({ success: true, message: "Royal Palace Server Is Running" });
 });
 
+
+
 swaggerDoc(app);
+
 mainRoutes(app);
 
 // -------------------------------
@@ -91,7 +100,8 @@ app.use((req, res) => {
 // SENTRY ERROR HANDLER (BEFORE GLOBAL)
 // ==============================
 // MUST be before your global handler
-app.use(Sentry.expressErrorHandler());
+// The error handler must be registered before any other error middleware and after all controllers
+Sentry.setupExpressErrorHandler(app);
 
 // ==============================
 // GLOBAL ERROR HANDLER (LAST)

@@ -72,8 +72,9 @@ const loginUser = catchAsyncHandeller(
 //================================find single user=============================================
 const getSingleUser = catchAsyncHandeller(
   async (req: Request, res: Response, next: NextFunction) => {
-    const id = sanitize(req.params.id);
-    const user = await userServices.findUserById(id as string);
+    console.log("🔍 Fetching user with query:", req.query);
+    const query = sanitize(req.query);
+    const user = await userServices.getSingleUser(query);
 
     res.status(200).json({
       success: true,

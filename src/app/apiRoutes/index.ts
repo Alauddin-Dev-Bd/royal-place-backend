@@ -32,7 +32,7 @@ export const routesV1: IRouteV1[] = [
 // -------------------
 // 3. Register main routes with common prefix
 // -------------------
-export const mainRoutes = (app: Application, apiPrefix = "/api/v1") => {
+export const mainRoutes = (app: Application, apiPrefix = "/api") => {
   routesV1.forEach((route) => {
     app.use(`${apiPrefix}${route.path}`, route.handler);
   });
